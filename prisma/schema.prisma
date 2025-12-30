@@ -1,0 +1,221 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id
+  email     String   @unique
+  createdAt DateTime @default(now())
+  posts     Post[]
+  onboardingComplete Boolean @default(false)
+  voiceProfile      String? // JSON string
+  hookAnalyses      HookAnalysis[]
+  plan              String   @default("FREE") // FREE, PRO, BUSINESS
+  subscriptionDate  DateTime?
+}
+
+model Post {
+  id        String   @id @default(uuid())
+  content   String
+  tone      String?
+  type      String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  hookScore Int?
+}
+
+model HookAnalysis {
+  id        String   @id @default(uuid())
+  hookText  String
+  score     Int
+  feedback  String // JSON string detailing badges and stats
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model MarketingSettings {
+  id                String   @id @default(uuid())
+  productName       String
+  productDescription String
+  targetAudience    String
+  brandVoice        String
+  primaryWebsiteUrl String
+  enabledPlatforms  String   @default("[\"linkedin\", \"twitter\"]") // Stored as JSON string
+  postsPerDay       Int      @default(3)
+  automationConfig  String?  // JSON: { webhookUrl, secret }
+  timeZone          String   @default("UTC")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model MarketingPost {
+  id             String    @id @default(uuid())
+  platform       String
+  content        String
+  status         String    @default("draft") // draft, scheduled, published, failed
+  remoteStatus   String?   // sent_to_make, etc.
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  errorMessage   String?
+  utmCampaign    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  clicks         MarketingClick[]
+}
+
+model MarketingClick {
+  id        String        @id @default(uuid())
+  postId    String
+  post      MarketingPost @relation(fields: [postId], references: [id])
+  clickedAt DateTime      @default(now())
+  sourceIp  String?
+}
+
+model MarketingArticle {
+  id        String    @id @default(uuid())
+  title     String
+  slug      String    @unique
+  platform  String
+  content   String
+  status    String    @default("draft") // draft, ready_to_post, posted
+  targetUrl String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  postedAt  DateTime?
+}
+
+
+model AdminUser {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     AdminSession[]
+}
+
+
+model AdminSession {
+  id           String    @id @default(uuid())
+  sessionToken String    @unique
+  expiresAt    DateTime
+  adminUserId  String
+  adminUser    AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+}
+
+// --- OUTREACH ENGINE ---
+
+model Lead {
+  id        String   @id @default(uuid())
+  userId    String?  // Links to User table if they have signed up
+  email     String   @unique
+  name      String?
+  source    String   // signup, contact_form, manual_import
+  status    String   // new, onboarding, active, inactive, unsubscribed
+  tags      String?  // JSON string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  events    OutreachEvent[]
+}
+
+model OutreachSequence {
+  id          String   @id @default(uuid())
+  name        String
+  triggerType String   // on_signup, inactive_days
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  steps       OutreachStep[]
+  events      OutreachEvent[]
+}
+
+model OutreachStep {
+  id               String           @id @default(uuid())
+  sequenceId       String
+  sequence         OutreachSequence @relation(fields: [sequenceId], references: [id])
+  stepNumber       Int
+  delayMinutes     Int
+  subjectTemplate  String
+  bodyTemplateHtml String
+  bodyTemplateText String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  events           OutreachEvent[]
+}
+
+model OutreachEvent {
+  id            String           @id @default(uuid())
+  leadId        String
+  lead          Lead             @relation(fields: [leadId], references: [id])
+  sequenceId    String
+  sequence      OutreachSequence @relation(fields: [sequenceId], references: [id])
+  stepId        String
+  step          OutreachStep     @relation(fields: [stepId], references: [id])
+  eventType     String           // queued, sent, failed
+  plannedSendAt DateTime
+  sentAt        DateTime?
+  errorMessage  String?
+  createdAt     DateTime         @default(now())
+}
+
+// --- SUPPORT ENGINE ---
+
+model SupportTicket {
+  id         String   @id @default(uuid())
+  userId     String?
+  email      String
+  subject    String
+  message    String
+  status     String   @default("open") // open, in_progress, resolved, closed
+  priority   String   @default("normal") // low, normal, high
+  resolvedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  events     SupportTicketEvent[]
+}
+
+model SupportTicketEvent {
+  id        String        @id @default(uuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  eventType String        // created, status_changed, admin_note, admin_replied
+  actor     String        // system, admin:<email>, user
+  message   String?
+  createdAt DateTime      @default(now())
+}
+
+model SupportFAQ {
+  id              String   @id @default(uuid())
+  question        String
+  answerMarkdown  String
+  category        String
+  tags            String?  // JSON string list
+  isPublished     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SupportArticle {
+  id              String   @id @default(uuid())
+  title           String
+  slug            String   @unique
+  contentMarkdown String
+  category        String
+  tags            String?  // JSON string list
+  isPublished     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+

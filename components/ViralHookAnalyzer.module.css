@@ -1,0 +1,175 @@
+.container {
+    background: #111;
+    padding: 2rem;
+    border-radius: 12px;
+    border: 1px solid #333;
+    margin-bottom: 2rem;
+}
+
+.title {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: #fff;
+}
+
+.subtitle {
+    color: #888;
+    margin-bottom: 1.5rem;
+}
+
+.inputGroup {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.textarea {
+    flex: 1;
+    background: #0a0a0a;
+    border: 1px solid #333;
+    color: #fff;
+    padding: 1rem;
+    border-radius: 8px;
+    resize: none;
+}
+
+.analyzeButton {
+    background: #0070f3;
+    color: white;
+    border: none;
+    padding: 0 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.analyzeButton:hover:not(:disabled) {
+    background: #0051a2;
+}
+
+.analyzeButton:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
+}
+
+.resultContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.scoreCircle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    border: 4px solid;
+}
+
+.green {
+    border-color: #10b981;
+    color: #10b981;
+}
+
+.yellow {
+    border-color: #f59e0b;
+    color: #f59e0b;
+}
+
+.red {
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.scoreValue {
+    font-size: 2.5rem;
+    font-weight: 800;
+}
+
+.scoreLabel {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+.badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.badge {
+    background: #222;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    border: 1px solid #333;
+}
+
+.explanationToggle button {
+    background: none;
+    border: none;
+    color: #888;
+    text-decoration: underline;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+}
+
+.feedback {
+    color: #ccc;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    background: #1a1a1a;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.alternatives h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    color: #fff;
+}
+
+.alternatives ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.alternatives li {
+    background: #1a1a1a;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 3px solid #0070f3;
+    color: #ddd;
+}
+
+@media (max-width: 600px) {
+    .inputGroup {
+        flex-direction: column;
+    }
+
+    .analyzeButton {
+        padding: 1rem;
+    }
+}

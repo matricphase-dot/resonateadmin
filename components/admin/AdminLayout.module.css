@@ -1,0 +1,148 @@
+.layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: #f3f4f6;
+    font-family: var(--font-sans);
+}
+
+.sidebar {
+    width: 260px;
+    background-color: #1f2937;
+    /* Dark Gray */
+    color: white;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+.sidebarHeader {
+    padding: 1.5rem;
+    border-bottom: 1px solid #374151;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.logoText {
+    font-weight: 700;
+    font-size: 1.125rem;
+    letter-spacing: -0.025em;
+    color: white;
+}
+
+.nav {
+    padding: 1rem 0;
+    flex: 1;
+}
+
+.navItem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    color: #9ca3af;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.navItem:hover {
+    color: white;
+    background-color: #374151;
+}
+
+.navItemActive {
+    color: white;
+    background-color: #374151;
+    border-right: 3px solid var(--linkedin-blue);
+}
+
+.mainContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+}
+
+.topbar {
+    height: 64px;
+    background-color: white;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.breadcrumbs {
+    font-size: 0.875rem;
+    color: #4b5563;
+}
+
+.breadcrumbCurrent {
+    font-weight: 600;
+    color: #111827;
+}
+
+.userMenu {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.userInfo {
+    text-align: right;
+}
+
+.userName {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #111827;
+    display: block;
+}
+
+.userRole {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.signOutButton {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    color: #ef4444;
+    background: #fef2f2;
+    border: 1px solid #fee2e2;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.signOutButton:hover {
+    background: #fee2e2;
+}
+
+.pageContent {
+    padding: 2rem;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        height: 100%;
+        transform: translateX(-100%);
+        z-index: 50;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+}
