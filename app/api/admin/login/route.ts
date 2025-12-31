@@ -6,54 +6,65 @@ export async function POST(req: NextRequest) {
     try {
         const { email } = await req.json();
 
-        // Log EVERYTHING
-        console.log('🔍 PRODUCTION LOGIN DEBUG:', {
-            email,
-            smtpHost: process.env.SMTP_HOST || 'MISSING ❌',
-            smtpUser: process.env.SMTP_USER || 'MISSING ❌',
-            smtpPassLen: process.env.SMTP_PASS ? process.env.SMTP_PASS.length + ' chars' : 'MISSING ❌',
-            nodeEnv: process.env.NODE_ENV,
-        });
+        console.log('🔐 ADMIN LOGIN:', { email, timestamp: new Date().toISOString() });
 
+        // Super-admin only
         if (email !== 'resonate.admin8153@protonmail.com') {
-            return NextResponse.json({ error: 'Wrong email' }, { status: 403 });
+            return NextResponse.json({ error: 'Invalid admin email' }, { status: 403 });
         }
 
-        const otp = '123456'; // HARDCODE for testing
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Store OTP
+        // Store OTP securely
         const cookieStore = await cookies();
-        cookieStore.set('admin_otp', otp, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 3600 });
-
-        // TEST SMTP with FULL ERROR
-        await sendEmail({
-            to: email,
-            subject: '🔍 SMTP DIAGNOSTIC TEST',
-            html: `<h1>TEST: ${otp}</h1><p>Env vars logged to Vercel console</p>`,
+        cookieStore.set('admin_otp', otp, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 600, // 10 minutes
         });
 
+        // Send OTP via Zoho SMTP
+        await sendEmail({
+            to: email,
+            subject: '🔐 Resonate Admin Login Code',
+            html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px;">
+          <h1 style="color: #1e40af;">Admin Login Code</h1>
+          <div style="background: #1e40af; color: white; font-size: 48px; font-weight: bold; letter-spacing: 12px; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+            ${otp}
+          </div>
+          <p>This code expires in 10 minutes.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            Sent from production server<br>
+            ${new Date().toLocaleString()}
+          </p>
+        </div>
+      `,
+        });
+
+        console.log('✅ OTP SENT SUCCESSFULLY:', { email, otpLength: otp.length });
         return NextResponse.json({
             success: true,
-            otp_sent: true,
-            debug: {
-                smtpHost: process.env.SMTP_HOST ? 'OK' : '🚨 MISSING - Vercel Dashboard!',
-                smtpUser: process.env.SMTP_USER ? 'OK' : '🚨 MISSING',
-                smtpPass: process.env.SMTP_PASS ? 'OK' : '🚨 MISSING - CRITICAL!',
-            }
+            message: 'Login code sent! Check your ProtonMail inbox.'
         });
 
     } catch (error: any) {
-        console.error('🔴 FULL SMTP ERROR:', error);
+        console.error('🔴 LOGIN ERROR:', {
+            message: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString(),
+        });
 
         return NextResponse.json({
             success: false,
             error: error.message,
-            debug: {
-                smtpHost: process.env.SMTP_HOST || 'MISSING ❌',
-                smtpUser: process.env.SMTP_USER || 'MISSING ❌',
-                smtpPass: process.env.SMTP_PASS ? 'EXISTS' : '🚨 CRITICAL - SET IN VERCEL!',
-                fix: 'Vercel → Project → Settings → Environment Variables → Add SMTP vars NOW',
-            }
+            type: error.message.includes('ENV') ? 'ENV_VARS_MISSING' :
+                error.message.includes('SMTP') ? 'SMTP_CONFIG' : 'UNKNOWN',
+            fix: error.message.includes('ENV') ?
+                'Go to Vercel Dashboard → Settings → Environment Variables → Add ALL SMTP vars' :
+                'Check Vercel Function Logs for SMTP details',
         }, { status: 500 });
     }
 }

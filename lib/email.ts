@@ -1,68 +1,102 @@
 import nodemailer from 'nodemailer';
 
-export async function sendEmail(options: { to: string; subject: string; html: string }) {
-    // CRITICAL: Log ALL env vars (masked)
-    console.log('🔍 SMTP ENV CHECK:', {
-        SMTP_HOST: process.env.SMTP_HOST || 'MISSING ❌',
-        SMTP_PORT: process.env.SMTP_PORT || 'MISSING ❌',
-        SMTP_USER: process.env.SMTP_USER || 'MISSING ❌',
-        HAS_SMTP_PASS: !!process.env.SMTP_PASS ? `${process.env.SMTP_PASS?.length} chars ✓` : 'MISSING ❌',
-        EMAIL_FROM: process.env.EMAIL_FROM_ADDRESS || 'MISSING ❌',
-    });
+// FAIL-FAST: Check env vars BEFORE transporter creation
+function validateEnvVars() {
+    const missing = [];
+    if (!process.env.SMTP_HOST) missing.push('SMTP_HOST');
+    if (!process.env.SMTP_PORT) missing.push('SMTP_PORT');
+    if (!process.env.SMTP_USER) missing.push('SMTP_USER');
+    if (!process.env.SMTP_PASS) missing.push('SMTP_PASS');
+    if (!process.env.EMAIL_FROM_ADDRESS) missing.push('EMAIL_FROM_ADDRESS');
 
-    // FAIL FAST if env vars missing
-    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        const error = new Error('🚨 VERCEL ENV VARS MISSING - Check Vercel Dashboard → Settings → Environment Variables');
+    if (missing.length > 0) {
+        const error = new Error(`🚨 VERCEL ENV VARS MISSING: ${missing.join(', ')}\nGo to Vercel Dashboard → Settings → Environment Variables`);
         console.error(error.message);
         throw error;
     }
+    console.log('✅ ALL SMTP ENV VARS PRESENT');
+}
 
-    const transporter = nodemailer.createTransport({
+// Only validate in production or if SMTP is explicitly being used
+if (process.env.NODE_ENV === 'production') {
+    validateEnvVars();
+}
+
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST!,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false, // Port 587 = STARTTLS
+    auth: {
+        user: process.env.SMTP_USER!,
+        pass: process.env.SMTP_PASS!,
+    },
+    // @ts-ignore
+    authMethod: 'LOGIN', // Zoho explicit requirement
+    tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2',
+    },
+    pool: true,
+    maxConnections: 1,
+    rateDelta: 60000, // 1 min
+    rateLimit: 10, // 10 emails/min
+    // @ts-ignore
+    debug: true, // Full SMTP logs
+    // @ts-ignore
+    logger: true,
+});
+
+export async function sendEmail(options: {
+    to: string;
+    subject: string;
+    html: string;
+}) {
+    console.log('📤 ZOHO SMTP DEBUG:', {
+        to: options.to,
         host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: false, // 587 = TLS
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-        },
-        // @ts-ignore
-        authMethod: 'LOGIN',
-        tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' },
-        // @ts-ignore
-        logger: process.env.NODE_ENV === 'production', // Vercel logs
-        debug: process.env.NODE_ENV !== 'production',
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER,
+        passLength: process.env.SMTP_PASS?.length || 0,
     });
 
     try {
         const result = await transporter.sendMail({
-            from: `"Resonate" <${process.env.EMAIL_FROM_ADDRESS}>`,
+            from: `"Resonate Admin" <${process.env.EMAIL_FROM_ADDRESS!}>`,
             to: options.to,
             subject: options.subject,
             html: options.html,
-            text: options.html.replace(/<[^>]*>/g, ''),
+            text: options.html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
+            headers: {
+                'X-Mailer': 'Resonate-Admin-Production',
+            },
         });
 
-        console.log('✅ EMAIL SENT:', { messageId: result.messageId, to: options.to });
+        console.log('✅ ZOHO SMTP SUCCESS:', {
+            messageId: result.messageId,
+            accepted: result.accepted,
+            rejected: result.rejected,
+        });
+
         return { success: true, messageId: result.messageId };
 
     } catch (error: any) {
-        console.error('🔴 SMTP DETAILED ERROR:', {
+        console.error('🔴 ZOHO SMTP FAILURE:', {
             message: error.message,
             code: error.code,
-            responseCode: error.responseCode,
             command: error.command,
-            stack: error.stack,
-            envCheck: {
+            responseCode: error.responseCode,
+            response: error.response,
+            smtpConfig: {
                 host: process.env.SMTP_HOST,
+                port: process.env.SMTP_PORT,
                 user: process.env.SMTP_USER,
-                passLength: process.env.SMTP_PASS?.length,
             }
         });
-        throw new Error(`SMTP ERROR: ${error.message} | Code: ${error.responseCode || 'N/A'}`);
+
+        throw new Error(`ZOHO SMTP FAILED: ${error.responseCode || error.code || error.message}`);
     }
 }
 
-// Keep template function for outreach/support
 export interface SendEmailTemplateOptions {
     to: string;
     subjectTemplate: string;
