@@ -1,16 +1,15 @@
 {
-  "name": "linkedin-generator",
-  "version": "0.1.0",
+  "name": "resonateadmin",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "next lint",
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.36.0",
     "@exodus/bytes": "^1.7.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
@@ -20,22 +19,29 @@
     "cheerio": "^1.1.2",
     "clsx": "^2.1.1",
     "lucide-react": "^0.556.0",
-    "next": "15.1.4",
-    "nodemailer": "^7.0.12",
+    "next": "15.2.3",
+    "nodemailer": "^6.9.13",
     "openai": "^6.10.0",
     "razorpay": "^2.9.6",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.3.2"
   },
   "devDependencies": {
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "15.1.4",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "15.2.3",
+    "postcss": "^8",
     "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.0",
     "typescript": "^5"
-  }
+  },
+  "overrides": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "packageManager": "npm@10.2.4"
 }

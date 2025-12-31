@@ -1,7 +1,5 @@
-
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { auth, currentUser } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { withRetry } from '@/lib/ai-helper';
 
@@ -11,7 +9,6 @@ export async function POST(request: Request) {
     try {
         const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
         if (!apiKey) {
-            console.error("GOOGLE_GENERATIVE_AI_API_KEY is missing");
             return NextResponse.json(
                 { error: 'Server configuration error: Google AI API Key is missing.' },
                 { status: 500 }
@@ -19,32 +16,27 @@ export async function POST(request: Request) {
         }
 
         const { postContent, postAuthor } = await request.json();
-        const { userId } = await auth();
-        const user = await currentUser();
+        const userId = 'admin-stub';
 
         let userVoiceProfile = null;
         let userStories = [];
 
-        // Fetch user voice profile if logged in to make comments sound authentic
-        if (userId && user) {
-            const dbUser = await prisma.user.findUnique({
-                where: { id: userId },
-            });
+        // Fetch stubbed user info
+        const dbUser = await prisma.user.findUnique({
+            where: { id: userId },
+        });
 
-            if (dbUser?.voiceProfile) {
-                try {
-                    const profile = JSON.parse(dbUser.voiceProfile);
-                    userVoiceProfile = profile;
-                    userStories = profile.stories || [];
-                } catch (e) {
-                    console.error("Error parsing voice profile", e);
-                }
+        if (dbUser?.voiceProfile) {
+            try {
+                const profile = JSON.parse(dbUser.voiceProfile);
+                userVoiceProfile = profile;
+                userStories = profile.stories || [];
+            } catch (e) {
+                console.error("Error parsing voice profile", e);
             }
         }
 
         const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-
-        // Pick a random story to potentially use in the 'story' comment option
         const randomStory = userStories.length > 0 ? userStories[Math.floor(Math.random() * userStories.length)] : null;
         const tone = userVoiceProfile?.tone || 'Professional';
 
@@ -62,7 +54,6 @@ export async function POST(request: Request) {
     Keep comments under 50 words. Sound human, not AI. No hashtags.
     Return only valid JSON.`;
 
-        // Wrap generation in retry logic
         const result = await withRetry(async () => {
             return await model.generateContent(prompt);
         });
@@ -76,16 +67,8 @@ export async function POST(request: Request) {
         return NextResponse.json(data);
     } catch (error: any) {
         console.error("Comment generation error:", error);
-
-        let errorMessage = 'Failed to generate comments';
-        if (error.message && error.message.includes('404')) {
-            errorMessage = 'AI Model not found or API Key invalid. Please check server configuration.';
-        } else if (error.message) {
-            errorMessage = error.message;
-        }
-
         return NextResponse.json(
-            { error: errorMessage },
+            { error: 'Failed to generate comments' },
             { status: 500 }
         );
     }
