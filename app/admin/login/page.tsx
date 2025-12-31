@@ -27,7 +27,7 @@ export default function AdminLogin() {
                 router.push("/admin/verify");
             } else {
                 const data = await res.json();
-                setError(data.error || "Access denied");
+                setError(data.details ? `${data.error}: ${data.details}` : data.error || "Access denied");
             }
         } catch (err) {
             setError("Something went wrong");

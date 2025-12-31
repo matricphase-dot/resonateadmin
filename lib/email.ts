@@ -1,74 +1,68 @@
 import nodemailer from 'nodemailer';
 
-export const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.zoho.com',
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: false, // false for port 587 (TLS)
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
-    // @ts-ignore - authMethod is supported by some transports but types might be strict
-    authMethod: 'LOGIN', // ZOHO REQUIRES EXPLICIT LOGIN
-    tls: {
-        rejectUnauthorized: false // Production safety
-    },
-    pool: true,
-    maxConnections: 1,
-    maxMessages: 10,
-    rateDelta: 1000 * 60, // 1 min
-    rateLimit: 5, // 5 emails/min
-});
+export async function sendEmail(options: { to: string; subject: string; html: string }) {
+    // CRITICAL: Log ALL env vars (masked)
+    console.log('🔍 SMTP ENV CHECK:', {
+        SMTP_HOST: process.env.SMTP_HOST || 'MISSING ❌',
+        SMTP_PORT: process.env.SMTP_PORT || 'MISSING ❌',
+        SMTP_USER: process.env.SMTP_USER || 'MISSING ❌',
+        HAS_SMTP_PASS: !!process.env.SMTP_PASS ? `${process.env.SMTP_PASS?.length} chars ✓` : 'MISSING ❌',
+        EMAIL_FROM: process.env.EMAIL_FROM_ADDRESS || 'MISSING ❌',
+    });
 
-export async function sendEmail(options: {
-    to: string;
-    subject: string;
-    html: string;
-}) {
-    console.log('📤 Sending email to:', options.to);
-    console.log('📧 SMTP config:', {
+    // FAIL FAST if env vars missing
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        const error = new Error('🚨 VERCEL ENV VARS MISSING - Check Vercel Dashboard → Settings → Environment Variables');
+        console.error(error.message);
+        throw error;
+    }
+
+    const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
-        user: process.env.SMTP_USER,
-        hasPass: !!process.env.SMTP_PASS,
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: false, // 587 = TLS
+        auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+        },
+        // @ts-ignore
+        authMethod: 'LOGIN',
+        tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' },
+        // @ts-ignore
+        logger: process.env.NODE_ENV === 'production', // Vercel logs
+        debug: process.env.NODE_ENV !== 'production',
     });
 
     try {
         const result = await transporter.sendMail({
-            from: `"${process.env.EMAIL_FROM_NAME || 'Resonate'}" <${process.env.EMAIL_FROM_ADDRESS || 'resonateteam@zohomail.com'}>`,
+            from: `"Resonate" <${process.env.EMAIL_FROM_ADDRESS}>`,
             to: options.to,
             subject: options.subject,
             html: options.html,
-            text: options.html.replace(/<[^>]*>/g, ''), // Plaintext fallback
+            text: options.html.replace(/<[^>]*>/g, ''),
         });
 
-        console.log('✅ ZOHO EMAIL SENT:', {
-            messageId: result.messageId,
-            to: options.to,
-            accepted: result.accepted,
-        });
+        console.log('✅ EMAIL SENT:', { messageId: result.messageId, to: options.to });
         return { success: true, messageId: result.messageId };
+
     } catch (error: any) {
-        console.error('🔴 ZOHO SMTP FULL ERROR:', {
+        console.error('🔴 SMTP DETAILED ERROR:', {
             message: error.message,
             code: error.code,
             responseCode: error.responseCode,
-            response: error.response,
             command: error.command,
-            stack: error.stack?.split('\n').slice(0, 3),
-            smtpConfig: {
+            stack: error.stack,
+            envCheck: {
                 host: process.env.SMTP_HOST,
-                port: process.env.SMTP_PORT,
-                user: process.env.SMTP_USER?.slice(0, 3) + '...',
-                hasPass: !!process.env.SMTP_PASS,
+                user: process.env.SMTP_USER,
+                passLength: process.env.SMTP_PASS?.length,
             }
         });
-
-        // Return detailed error to frontend
-        throw new Error(`SMTP FAILED: ${error.message} (Code: ${error.responseCode || 'N/A'})`);
+        throw new Error(`SMTP ERROR: ${error.message} | Code: ${error.responseCode || 'N/A'}`);
     }
 }
 
+// Keep template function for outreach/support
 export interface SendEmailTemplateOptions {
     to: string;
     subjectTemplate: string;
