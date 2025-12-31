@@ -1,22 +1,24 @@
-
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { requireAdmin } from '@/lib/security/authz';
-import AdminLayout from '@/components/admin/AdminLayout';
 
 export default async function ProtectedLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    try {
-        await requireAdmin();
-    } catch (e) {
+    const cookieStore = await cookies();
+    const adminSession = cookieStore.get('admin_session')?.value;
+
+    if (!adminSession) {
         redirect('/admin/login');
     }
 
     return (
-        <AdminLayout>
+        <div>
+            <nav style={{ padding: '1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', marginBottom: '1rem' }}>
+                <strong>Admin Dashboard</strong>
+            </nav>
             {children}
-        </AdminLayout>
+        </div>
     );
 }

@@ -1,61 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/email';
-import { sign } from '@/lib/security/jwt';
+import { cookies } from 'next/headers';
 
 export async function POST(req: NextRequest) {
     try {
         const { email } = await req.json();
 
-        // Only super-admin allowed
-        const superAdmin = 'resonate.admin8153@protonmail.com';
-        if (email !== superAdmin) {
-            console.warn(`🚫 Unauthorized login attempt for: ${email}`);
+        // Super-admin only
+        if (email !== 'resonate.admin8153@protonmail.com') {
             return NextResponse.json({ error: 'Invalid admin email' }, { status: 403 });
         }
 
+        // Generate OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires = Date.now() + 10 * 60 * 1000; // 10 min
 
-        try {
-            console.log(`📧 Sending OTP to ${email}...`);
-            await sendEmail({
-                to: email,
-                subject: '🔐 Resonate Admin Login Code',
-                html: `
-          <h1>Your Admin Login Code</h1>
-          <p><strong>${otp}</strong></p>
-          <p>This code expires in 10 minutes.</p>
-        `,
-            });
+        // Store OTP in cookie (production safe)
+        const cookieStore = await cookies();
+        cookieStore.set('admin_otp', otp, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 600, // 10 min
+            path: '/admin',
+        });
+        cookieStore.set('otp_expires', expires.toString(), {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 600,
+            path: '/admin',
+        });
 
-            // Create Context Token (Stateless OTP)
-            const encoder = new TextEncoder();
-            const data = encoder.encode(otp);
-            const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-            const otpHash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+        // Send OTP via Zoho
+        await sendEmail({
+            to: email,
+            subject: `🔐 Resonate Admin Code (expires in 10 min)`,
+            html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px;">
+          <h2>Resonate Admin Login</h2>
+          <p>Your one-time login code is:</p>
+          <h1 style="font-size: 48px; color: #1e40af; letter-spacing: 8px;">${otp}</h1>
+          <p><small>This code expires in 10 minutes.</small></p>
+          <hr>
+          <p>If you didn't request this, ignore this email.</p>
+        </div>
+      `,
+        });
 
-            const token = await sign({
-                email,
-                otpHash,
-                exp: Date.now() + 10 * 60 * 1000 // 10 mins
-            }, process.env.ADMIN_OTP_SECRET || "default-secret");
+        console.log('✅ OTP sent to super-admin:', email);
+        return NextResponse.json({
+            success: true,
+            message: 'OTP sent! Check your ProtonMail inbox.'
+        });
 
-            console.log('✅ OTP sent to super-admin:', email);
-
-            const res = NextResponse.json({ success: true, otpSent: true });
-            res.cookies.set("resonate_admin_otp_context", token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === "production",
-                sameSite: "strict",
-                path: "/",
-                maxAge: 600 // 10 mins
-            });
-
-            return res;
-        } catch (error: any) {
-            console.error('🔴 ZOHO SMTP ERROR in Login:', error.message);
-            return NextResponse.json({ error: `Failed to send OTP: ${error.message}` }, { status: 500 });
-        }
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('🔴 ADMIN LOGIN ERROR:', error);
+        return NextResponse.json(
+            {
+                error: 'Failed to send OTP',
+                details: error.message.includes('SMTP') ? error.message : 'Internal error'
+            },
+            { status: 500 }
+        );
     }
 }

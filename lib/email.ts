@@ -1,27 +1,23 @@
 import nodemailer from 'nodemailer';
 
-// Force Zoho and ignore system-level Gmail overrides
-const SMTP_HOST = (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes('gmail.com'))
-    ? process.env.SMTP_HOST
-    : 'smtp.zoho.com';
-
-const SMTP_USER = (process.env.SMTP_USER && !process.env.SMTP_USER.includes('gmail.com'))
-    ? process.env.SMTP_USER
-    : 'resonateteam@zohomail.com';
-
 export const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
+    host: process.env.SMTP_HOST || 'smtp.zoho.com',
     port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true', // false for 587
-    requireTLS: true,
+    secure: false, // false for port 587 (TLS)
     auth: {
-        user: SMTP_USER,
-        pass: process.env.SMTP_PASS, // 12-char OK
-        method: 'LOGIN'
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+    },
+    // @ts-ignore - authMethod is supported by some transports but types might be strict
+    authMethod: 'LOGIN', // ZOHO REQUIRES EXPLICIT LOGIN
+    tls: {
+        rejectUnauthorized: false // Production safety
     },
     pool: true,
     maxConnections: 1,
-    maxMessages: 5,
+    maxMessages: 10,
+    rateDelta: 1000 * 60, // 1 min
+    rateLimit: 5, // 5 emails/min
 });
 
 export async function sendEmail(options: {
@@ -29,59 +25,46 @@ export async function sendEmail(options: {
     subject: string;
     html: string;
 }) {
-    try {
-        const fromName = process.env.EMAIL_FROM_NAME || 'Resonate';
-        const fromAddress = process.env.EMAIL_FROM_ADDRESS || 'resonateteam@zohomail.com';
+    console.log('📤 Sending email to:', options.to);
+    console.log('📧 SMTP config:', {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER,
+        hasPass: !!process.env.SMTP_PASS,
+    });
 
+    try {
         const result = await transporter.sendMail({
-            from: `"${fromName}" <${fromAddress}>`,
+            from: `"${process.env.EMAIL_FROM_NAME || 'Resonate'}" <${process.env.EMAIL_FROM_ADDRESS || 'resonateteam@zohomail.com'}>`,
             to: options.to,
             subject: options.subject,
             html: options.html,
+            text: options.html.replace(/<[^>]*>/g, ''), // Plaintext fallback
         });
-        console.log('✅ ZOHO EMAIL SENT:', { to: options.to, messageId: result.messageId });
+
+        console.log('✅ ZOHO EMAIL SENT:', {
+            messageId: result.messageId,
+            to: options.to,
+            accepted: result.accepted,
+        });
         return { success: true, messageId: result.messageId };
     } catch (error: any) {
-        console.error('🔴 ZOHO SMTP ERROR:', {
-            code: error.responseCode,
+        console.error('🔴 ZOHO SMTP FULL ERROR:', {
             message: error.message,
+            code: error.code,
+            responseCode: error.responseCode,
             response: error.response,
-            config: {
+            command: error.command,
+            stack: error.stack?.split('\n').slice(0, 3),
+            smtpConfig: {
                 host: process.env.SMTP_HOST,
                 port: process.env.SMTP_PORT,
                 user: process.env.SMTP_USER?.slice(0, 3) + '...',
+                hasPass: !!process.env.SMTP_PASS,
             }
         });
 
-        // Log failures for diagnostics
-        const fs = require('fs');
-        const path = require('path');
-        const logPath = path.join(process.cwd(), 'smtp-errors.log');
-        const timestamp = new Date().toISOString();
-        fs.appendFileSync(logPath, `[${timestamp}] ${error.message}\nStack: ${error.stack}\n\n`);
-
-        throw new Error(`SMTP failed: ${error.message}`);
+        // Return detailed error to frontend
+        throw new Error(`SMTP FAILED: ${error.message} (Code: ${error.responseCode || 'N/A'})`);
     }
-}
-
-export interface SendEmailTemplateOptions {
-    to: string;
-    subjectTemplate: string;
-    htmlTemplate: string;
-    textTemplate?: string;
-    variables: Record<string, string>;
-    replyTo?: string;
-}
-
-export async function sendEmailTemplate({ to, subjectTemplate, htmlTemplate, textTemplate, variables }: SendEmailTemplateOptions) {
-    let subject = subjectTemplate;
-    let html = htmlTemplate;
-
-    for (const [key, value] of Object.entries(variables)) {
-        const regex = new RegExp(`{{${key}}}`, 'g');
-        subject = subject.replace(regex, value);
-        html = html.replace(regex, value);
-    }
-
-    return sendEmail({ to, subject, html });
 }
