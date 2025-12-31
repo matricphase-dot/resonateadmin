@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
             return res;
         } catch (error: any) {
             console.error('🔴 ZOHO SMTP ERROR in Login:', error.message);
-            return NextResponse.json({ error: 'Failed to send OTP' }, { status: 500 });
+            return NextResponse.json({ error: `Failed to send OTP: ${error.message}` }, { status: 500 });
         }
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

@@ -13,6 +13,7 @@ export const transporter = nodemailer.createTransport({
     host: SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
     secure: process.env.SMTP_SECURE === 'true', // false for 587
+    requireTLS: true,
     auth: {
         user: SMTP_USER,
         pass: process.env.SMTP_PASS, // 12-char OK
