@@ -9,31 +9,41 @@ export async function POST(req: NextRequest) {
         const storedOtp = cookieStore.get('admin_otp')?.value;
         const expires = parseInt(cookieStore.get('otp_expires')?.value || '0');
 
+        console.log('🔍 OTP VERIFY:', {
+            inputOtp: otp?.slice(0, 3) + '...',
+            storedOtp: storedOtp ? storedOtp.slice(0, 3) + '...' : 'MISSING',
+            expired: Date.now() > expires
+        });
+
         if (!storedOtp || Date.now() > expires) {
-            return NextResponse.json({ error: 'OTP expired or invalid' }, { status: 400 });
+            return NextResponse.json({ error: 'Code expired or not found. Request new code.' }, { status: 400 });
         }
 
         if (otp !== storedOtp) {
-            return NextResponse.json({ error: 'Invalid OTP' }, { status: 400 });
+            return NextResponse.json({ error: 'Invalid code' }, { status: 400 });
         }
 
         // Create admin session
-        const response = NextResponse.json({ success: true, message: 'Admin logged in' });
-        response.cookies.set('admin_session', 'superadmin_prod_' + Date.now(), {
+        const response = NextResponse.json({ success: true });
+
+        // Set the admin session cookie on the response
+        response.cookies.set('admin_session', 'SUPERADMIN_' + Date.now(), {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
+            path: '/', // Session valid for all routes
             maxAge: 7 * 24 * 60 * 60, // 7 days
-            path: '/',
         });
 
-        // Clear OTP
-        cookieStore.delete('admin_otp');
-        cookieStore.delete('otp_expires');
+        // Clear internal OTP verification cookies
+        response.cookies.delete('admin_otp');
+        response.cookies.delete('otp_expires');
 
+        console.log('✅ OTP VERIFIED - SESSION CREATED');
         return response;
 
-    } catch (error) {
-        return NextResponse.json({ error: 'Verification failed' }, { status: 500 });
+    } catch (error: any) {
+        console.error('🔴 VERIFY ERROR:', error);
+        return NextResponse.json({ error: 'Verification failed: ' + error.message }, { status: 500 });
     }
 }

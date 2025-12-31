@@ -6,65 +6,69 @@ export async function POST(req: NextRequest) {
     try {
         const { email } = await req.json();
 
-        console.log('🔐 ADMIN LOGIN:', { email, timestamp: new Date().toISOString() });
+        console.log('🔐 LOGIN ATTEMPT:', { email });
 
-        // Super-admin only
-        if (email !== 'resonate.admin8153@protonmail.com') {
-            return NextResponse.json({ error: 'Invalid admin email' }, { status: 403 });
+        // ✅ EXACT EMAIL MATCH (case-sensitive)
+        const VALID_ADMIN_EMAIL = 'resonate.admin8153@protonmail.com';
+        if (email !== VALID_ADMIN_EMAIL) {
+            console.log('❌ INVALID EMAIL:', email);
+            return NextResponse.json({
+                error: `Invalid admin email. Use: ${VALID_ADMIN_EMAIL}`
+            }, { status: 403 });
         }
 
+        // Generate OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires = Date.now() + 10 * 60 * 1000; // 10 min
 
-        // Store OTP securely
+        // Store OTP in cookies
         const cookieStore = await cookies();
         cookieStore.set('admin_otp', otp, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
-            maxAge: 600, // 10 minutes
+            maxAge: 600,
+            path: '/admin',
         });
+        cookieStore.set('otp_expires', expires.toString(), {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 600,
+            path: '/admin',
+        });
+
+        console.log('📱 OTP GENERATED:', otp.slice(0, 3) + '...');
 
         // Send OTP via Zoho SMTP
         await sendEmail({
             to: email,
-            subject: '🔐 Resonate Admin Login Code',
+            subject: '🔐 Resonate Admin Code',
             html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px;">
-          <h1 style="color: #1e40af;">Admin Login Code</h1>
-          <div style="background: #1e40af; color: white; font-size: 48px; font-weight: bold; letter-spacing: 12px; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+        <div style="font-family: Arial; max-width: 500px;">
+          <h2>Resonate Admin Login</h2>
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                      color: white; font-size: 48px; font-weight: bold; 
+                      letter-spacing: 8px; padding: 30px; text-align: center; 
+                      border-radius: 12px; margin: 20px 0;">
             ${otp}
           </div>
-          <p>This code expires in 10 minutes.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-          <p style="font-size: 12px; color: #666;">
-            Sent from production server<br>
-            ${new Date().toLocaleString()}
-          </p>
+          <p>Enter this code on the admin login page.</p>
+          <p><em>Expires in 10 minutes</em></p>
         </div>
       `,
         });
 
-        console.log('✅ OTP SENT SUCCESSFULLY:', { email, otpLength: otp.length });
+        console.log('✅ OTP SENT TO:', email);
         return NextResponse.json({
             success: true,
-            message: 'Login code sent! Check your ProtonMail inbox.'
+            message: 'Code sent! Check ProtonMail inbox.'
         });
 
     } catch (error: any) {
-        console.error('🔴 LOGIN ERROR:', {
-            message: error.message,
-            stack: error.stack,
-            timestamp: new Date().toISOString(),
-        });
-
+        console.error('🔴 LOGIN ERROR:', error);
         return NextResponse.json({
-            success: false,
-            error: error.message,
-            type: error.message.includes('ENV') ? 'ENV_VARS_MISSING' :
-                error.message.includes('SMTP') ? 'SMTP_CONFIG' : 'UNKNOWN',
-            fix: error.message.includes('ENV') ?
-                'Go to Vercel Dashboard → Settings → Environment Variables → Add ALL SMTP vars' :
-                'Check Vercel Function Logs for SMTP details',
+            error: error.message.includes('SMTP') ? 'SMTP failed - check Vercel env vars' : error.message
         }, { status: 500 });
     }
 }
