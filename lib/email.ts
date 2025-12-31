@@ -17,6 +17,7 @@ export const transporter = nodemailer.createTransport({
     auth: {
         user: SMTP_USER,
         pass: process.env.SMTP_PASS, // 12-char OK
+        method: 'LOGIN'
     },
     pool: true,
     maxConnections: 1,
