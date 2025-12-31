@@ -6,43 +6,54 @@ export async function POST(req: NextRequest) {
     try {
         const { email } = await req.json();
 
-        console.log('🔐 ADMIN LOGIN ATTEMPT:', { email });
+        // Log EVERYTHING
+        console.log('🔍 PRODUCTION LOGIN DEBUG:', {
+            email,
+            smtpHost: process.env.SMTP_HOST || 'MISSING ❌',
+            smtpUser: process.env.SMTP_USER || 'MISSING ❌',
+            smtpPassLen: process.env.SMTP_PASS ? process.env.SMTP_PASS.length + ' chars' : 'MISSING ❌',
+            nodeEnv: process.env.NODE_ENV,
+        });
 
         if (email !== 'resonate.admin8153@protonmail.com') {
-            return NextResponse.json({ error: 'Invalid admin email' }, { status: 403 });
+            return NextResponse.json({ error: 'Wrong email' }, { status: 403 });
         }
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = '123456'; // HARDCODE for testing
 
         // Store OTP
         const cookieStore = await cookies();
-        cookieStore.set('admin_otp', otp, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 600 });
-        cookieStore.set('otp_expires', (Date.now() + 600000).toString(), { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 600 });
+        cookieStore.set('admin_otp', otp, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 3600 });
 
-        // Send OTP
+        // TEST SMTP with FULL ERROR
         await sendEmail({
             to: email,
-            subject: '🔐 Resonate Admin OTP (10 min expiry)',
-            html: `
-        <h1 style="color: #1e40af;">Your Admin Code: ${otp}</h1>
-        <p>Valid for 10 minutes only.</p>
-        <hr>
-        <p>Site: ${process.env.APP_BASE_URL || 'Production'}</p>
-      `,
+            subject: '🔍 SMTP DIAGNOSTIC TEST',
+            html: `<h1>TEST: ${otp}</h1><p>Env vars logged to Vercel console</p>`,
         });
 
-        console.log('✅ OTP GENERATED + SENT:', { email, otpLength: otp.length });
-        return NextResponse.json({ success: true, message: 'Check ProtonMail (OTP sent)' });
+        return NextResponse.json({
+            success: true,
+            otp_sent: true,
+            debug: {
+                smtpHost: process.env.SMTP_HOST ? 'OK' : '🚨 MISSING - Vercel Dashboard!',
+                smtpUser: process.env.SMTP_USER ? 'OK' : '🚨 MISSING',
+                smtpPass: process.env.SMTP_PASS ? 'OK' : '🚨 MISSING - CRITICAL!',
+            }
+        });
 
     } catch (error: any) {
-        console.error('🔴 LOGIN API ERROR:', error.message);
-        return NextResponse.json(
-            {
-                error: 'OTP failed',
-                details: error.message.includes('SMTP') || error.message.includes('VERCEL') ? error.message : 'Server error',
-                smtpCheck: process.env.SMTP_PASS ? 'PASS OK' : 'MISSING PASS ❌'
-            },
-            { status: 500 }
-        );
+        console.error('🔴 FULL SMTP ERROR:', error);
+
+        return NextResponse.json({
+            success: false,
+            error: error.message,
+            debug: {
+                smtpHost: process.env.SMTP_HOST || 'MISSING ❌',
+                smtpUser: process.env.SMTP_USER || 'MISSING ❌',
+                smtpPass: process.env.SMTP_PASS ? 'EXISTS' : '🚨 CRITICAL - SET IN VERCEL!',
+                fix: 'Vercel → Project → Settings → Environment Variables → Add SMTP vars NOW',
+            }
+        }, { status: 500 });
     }
 }
