@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/request';
-import { cookies } from 'next/headers';
+import type { NextRequest } from 'next/server';
 
-export async function middleware(request: NextRequest) {
-    const cookieStore = await cookies();
-    const adminSession = cookieStore.get('admin_session')?.value;
+export function middleware(request: NextRequest) {
+    const { pathname } = request.nextUrl;
 
-    if (request.nextUrl.pathname.startsWith('/admin') &&
-        request.nextUrl.pathname !== '/admin/login' &&
-        !adminSession) {
-        return NextResponse.redirect(new URL('/admin/login', request.url));
+    // Protect all /admin routes except for the login page
+    if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
+        const adminSession = request.cookies.get('admin_session')?.value;
+
+        // Strict check for SUPERADMIN session
+        if (!adminSession || !adminSession.includes('SUPERADMIN')) {
+            console.log('🚫 REJECTED: No valid admin session found for', pathname);
+            return NextResponse.redirect(new URL('/admin/login', request.url));
+        }
     }
 
     return NextResponse.next();
