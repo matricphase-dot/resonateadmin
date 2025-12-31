@@ -68,3 +68,25 @@ export async function sendEmail(options: {
         throw new Error(`SMTP FAILED: ${error.message} (Code: ${error.responseCode || 'N/A'})`);
     }
 }
+
+export interface SendEmailTemplateOptions {
+    to: string;
+    subjectTemplate: string;
+    htmlTemplate: string;
+    textTemplate?: string;
+    variables: Record<string, string>;
+    replyTo?: string;
+}
+
+export async function sendEmailTemplate({ to, subjectTemplate, htmlTemplate, textTemplate, variables }: SendEmailTemplateOptions) {
+    let subject = subjectTemplate;
+    let html = htmlTemplate;
+
+    for (const [key, value] of Object.entries(variables)) {
+        const regex = new RegExp(`{{${key}}}`, 'g');
+        subject = subject.replace(regex, value);
+        html = html.replace(regex, value);
+    }
+
+    return sendEmail({ to, subject, html });
+}
