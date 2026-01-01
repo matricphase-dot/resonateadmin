@@ -1,5 +1,5 @@
 {
-  "name": "resonateadmin",
+  "name": "resonate-admin-core",
   "version": "1.0.2",
   "private": true,
   "scripts": {
